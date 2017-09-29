@@ -1,0 +1,4 @@
+*.pyc
+temp
+.vscode
+_maven-cache

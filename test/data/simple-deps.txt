@@ -1,0 +1,14 @@
+
+# -- comment-------------------------------
+# some-group:some-artifact:1.2
+# -----------------------------------------
+
+commons-beanutils:commons-beanutils:1.8.3
+commons-io:commons-io:2.4
+commons-lang:commons-lang:2.6
+
++ - javax.mail:mail:1.4.5
+=== javax.servlet.jsp:jsp-api:2.2
+--- javax.servlet:jstl:1.2
++++ javax.servlet:javax.servlet-api:3.0.1
+||| javax.servlet:servlet-api:2.5
