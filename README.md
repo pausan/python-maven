@@ -1,4 +1,4 @@
-= python-maven
+# python-maven
 
 This project was initially built to deal with maven repositories and dependencies
 for (pyke built tool)[http://pykebuildtool.com]. 
@@ -13,17 +13,19 @@ need some external dependencies like (requests)[http://docs.python-requests.org/
 It has only been tested on linux, but I see no reasons why it should not work
 on different platforms as well (although I have not tested it yet).
 
-== Examples
+## Examples
 
 At this moment I would advise you to take a look at the tests folders, there
 are plenty of unit tests that cover most functionality.
 
 To run the tests
-  
+
+```shell
   $ cd test
   $ python all.py
+  ```
 
-== Copyright
+## Copyright
 
 Copyright 2017 Pau Sanchez
 
