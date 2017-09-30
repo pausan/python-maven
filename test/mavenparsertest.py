@@ -84,6 +84,103 @@ class MavenParserTest (unittest.TestCase):
       )
     return
 
+  def testProfilesAllDisabled (self):
+    mvn = mavenparser.parseFile ('data/profiles/disabled-by-default.xml')
+
+    self.assertTrue (mvn.parent.empty())
+    self.assertEquals (mvn.coord.id,  'com.mycompany.app:my-app:1.0-SNAPSHOT')
+    self.assertEquals (mvn.deps.count(), 2)
+    
+    mvn.resolve()
+
+    self.assertEquals (mvn.deps.getFlattenCoordIds (), [
+      'org.apache.cxf:cxf-core:1.0.0',
+      'junit:junit:4.10',
+    ])    
+    return
+
+  def testProfilesEnabledByDefault (self):
+    mvn = mavenparser.parseFile ('data/profiles/enabled-by-default.xml')
+
+    self.assertTrue (mvn.parent.empty())
+    self.assertEquals (mvn.coord.id,  'com.mycompany.app:my-app:1.0-SNAPSHOT')
+    self.assertEquals (mvn.deps.count(), 2)
+    
+    mvn.resolve()
+
+    self.assertEquals (mvn.deps.getFlattenCoordIds (), [
+      'org.apache.cxf:cxf-core:3.0.2',
+      'junit:junit:4.11',
+    ])    
+    return 
+
+  def testProfilesEnabledByJdk (self):
+    mvn = mavenparser.parseFile ('data/profiles/enabled-by-jdk.xml')
+
+    self.assertTrue (mvn.parent.empty())
+    self.assertEquals (mvn.coord.id,  'com.mycompany.app:my-app:1.0-SNAPSHOT')
+    self.assertEquals (mvn.deps.count(), 2)
+    
+    mvn1 = mvn.clone()
+    mvn2 = mvn.clone()
+
+    # resolve using a JDK version that does not enable the profile
+    mvn1.resolve (jdkVersion = '1.6')
+
+    self.assertEquals (mvn1.deps.getFlattenCoordIds (), [
+      'org.apache.cxf:cxf-core:1.0.0',
+      'junit:junit:4.10'
+    ])   
+
+    # resolve using a JDK version that enables the profile
+    mvn2.resolve (jdkVersion = '1.9')
+
+    self.assertEquals (mvn2.deps.getFlattenCoordIds (), [
+      'org.apache.cxf:cxf-core:3.0.2',
+      'junit:junit:4.11',
+    ])
+
+    return
+
+  def testProfilesEnabledByProperty(self):
+    mvn = mavenparser.parseFile ('data/profiles/enabled-by-property.xml')
+
+    self.assertTrue (mvn.parent.empty())
+    self.assertEquals (mvn.coord.id,  'com.mycompany.app:my-app:1.0-SNAPSHOT')
+    self.assertEquals (mvn.deps.count(), 2)
+    
+    mvn1 = mvn.clone()
+    mvn2 = mvn.clone()
+    mvn3 = mvn.clone()
+
+    # resolve with no property set
+    mvn1.resolve ()
+
+    self.assertEquals (mvn1.deps.getFlattenCoordIds (), [
+      'org.apache.cxf:cxf-core:1.0.0',
+      'junit:junit:4.10'
+    ])   
+    
+    # resolve with a property with the wrong value
+    mvn2.setProperty ('my.property', 'wrong-value')
+    mvn2.resolve ()
+
+    self.assertEquals (mvn2.deps.getFlattenCoordIds (), [
+      'org.apache.cxf:cxf-core:1.0.0',
+      'junit:junit:4.10'
+    ])   
+
+    # resolve using a JDK version that enables the profile
+    mvn3.setProperty ('my.property', 'right-value')
+    mvn3.resolve (jdkVersion = '1.9')
+
+    self.assertEquals (mvn3.deps.getFlattenCoordIds (), [
+      'org.apache.cxf:cxf-core:3.0.2',
+      'junit:junit:4.11',
+    ])
+
+    return
+
   def testDepsResolveExclusionsNoVersion (self):
     """ Test that we can get dependencies without exclusions
     """
@@ -231,3 +328,5 @@ class MavenParserTest (unittest.TestCase):
     )
 
   
+if __name__ == '__main__':
+  unittest.main()

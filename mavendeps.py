@@ -13,11 +13,17 @@ class MavenDep:
     self.exclusions = []
     return
 
-  def add (self, dep):
+  def add (self, dep, override = False):
     """ Add dependency
     """
     if not isinstance (dep, MavenDep):
       raise Exception ("Expecting a MavenDep when adding dependency: %s" % str(dep))
+
+    if override:
+      self.deps = [d for d in self.deps if d.coord.name != dep.coord.name]
+
+    elif ([d for d in self.deps if d.coord.name == dep.coord.name]):
+      raise Exception ("Conflicting versions while adding dependencies: %s" % str(dep.coord))
 
     self.deps.append (dep)
     return
@@ -180,11 +186,11 @@ class MavenDeps:
     # remove 1 to account for the root element
     return self.root.count() - 1
 
-  def add (self, dep):
+  def add (self, dep, override = False):
     """ Adds a maven dependency by either specifying a coordinate string, a 
     MavenCoord or a MavenDep.
     """
-    self.root.add (dep)
+    self.root.add (dep, override)
     return
 
   def find (self, coord):
@@ -204,7 +210,7 @@ class MavenDeps:
       raise Exception ("Expecting MavenDeps object")
 
     for obj in mavenDepsObj.root.deps:
-      self.add (copy.deepcopy (obj))
+      self.add (copy.deepcopy (obj), override = True)
     return
 
   def expand (self, properties):

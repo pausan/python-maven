@@ -3,6 +3,7 @@
 
 from mavencoord import MavenCoord
 from maven import Maven
+from mavenprofile import MavenProfile
 from mavendeps import MavenDep, MavenDeps
 import requests
 import xmltodict
@@ -61,6 +62,7 @@ def parseString (pomString):
   maven.deps = _parseDependencies (project, maven.coord)
   maven.depsManagement = _parseDependencyManagement (project, maven.coord)  
   maven.properties = _parseProperties (project)
+  maven.profiles = _parseProfiles (project, maven.coord)
 
   return maven
 
@@ -119,3 +121,26 @@ def _parseProperties (projectObj):
 
   return properties
 
+def _parseProfiles (projectObj, mavenCoord):
+  """ Parse maven profiles
+  """
+  allProfileObjs = projectObj.get ('profiles', {})
+  if allProfileObjs is None:
+    allProfileObjs = []
+  else :
+    allProfileObjs = allProfileObjs.get ('profile', [])
+
+  if isinstance (allProfileObjs, dict):
+    allProfileObjs = [ allProfileObjs ]
+
+  profiles = []
+  for profileObj in allProfileObjs:
+    profile = MavenProfile()
+    profile.activation = profileObj.get ('activation', {})
+    profile.deps = _parseDependencies (profileObj, mavenCoord)
+    profile.depsManagement = _parseDependencyManagement (profileObj, mavenCoord)  
+    profile.properties = _parseProperties (profileObj)
+
+    profiles.append (profile)
+
+  return profiles

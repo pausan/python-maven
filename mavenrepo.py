@@ -6,6 +6,7 @@ import requests
 import shutil
 import xmltodict
 
+from maven import Maven
 from mavencoord import MavenCoord
 from mavenversiondb import MavenVersionDb
 import mavenparser
@@ -26,6 +27,7 @@ class MavenRepo:
     self._repoUrl = url
     self._versionDb = MavenVersionDb ()
     self._scheduledDownloads = {}
+    self._jdkVersion = Maven.DEFAULT_JDK_VERSION
 
     if isinstance (versionDb, basestring):
       self._versionDb = MavenVersionDb()
@@ -38,6 +40,14 @@ class MavenRepo:
     if self._cacheDir and (not os.path.exists (self._cacheDir)):
       os.makedirs (self._cacheDir)
 
+    return
+
+  def setJdkVersion (self, jdkVersion):
+    """ This version is used when resolving all maven objects. The value
+    specified here will be used by default when downloading items from
+    given repository.
+    """
+    self._jdkVersion = jdkVersion
     return
 
   def cleanCache (self):
@@ -165,10 +175,9 @@ class MavenRepo:
     if not maven:
       return None
 
-    maven.resolve()
+    maven.resolve (jdkVersion = self._jdkVersion)
 
     # TODO: handle provided
-    # TODO: handle profiles
 
     children = {}
     for dep in maven.deps.getFlattenDeps(skipOptional = True):
@@ -194,7 +203,7 @@ class MavenRepo:
         downloadedItems,
         newExclusions
       )
-      mavenChild.resolve()
+      mavenChild.resolve (jdkVersion = self._jdkVersion)
 
       children [dep.coord.id] = mavenChild
 
@@ -208,7 +217,7 @@ class MavenRepo:
       dep.deps += childDepsClone.root.deps
       dep.exclusions += childDepsClone.root.exclusions
 
-    maven.resolve()
+    maven.resolve (jdkVersion = self._jdkVersion)
 
     downloadedItems [coord.name] = maven
 
