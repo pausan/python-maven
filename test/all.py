@@ -7,6 +7,7 @@ import unittest
 from mavencoordtest import MavenCoordTest
 from mavenparsertest import MavenParserTest
 from mavenversiondbtest import MavenVersionDbTest
+from mavenversioncmptest import MavenVersionCompareTest
 from mavenrepotest import MavenRepoTest
 
 def suite():
@@ -14,6 +15,7 @@ def suite():
     unittest.TestLoader().loadTestsFromTestCase (MavenCoordTest),
     unittest.TestLoader().loadTestsFromTestCase (MavenParserTest),
     unittest.TestLoader().loadTestsFromTestCase (MavenVersionDbTest),
+    unittest.TestLoader().loadTestsFromTestCase (MavenVersionCompareTest),
     unittest.TestLoader().loadTestsFromTestCase (MavenRepoTest)
   ])
 
