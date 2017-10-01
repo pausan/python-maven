@@ -1,5 +1,6 @@
 #/usr/bin/env python
 # -*- coding: utf-8 -*- 
+import mavenversioncmp as vercmp
 
 class MavenCoord:
   """ This class helps to manage maven coordinates, which are formed by
@@ -14,6 +15,7 @@ class MavenCoord:
     self.group    = ''
     self.artifact = ''
     self.version  = ''
+    self.type     = 'jar'
     self.scope    = MavenCoord.SCOPE_DEFAULT
 
     if coordObject is None:
@@ -45,10 +47,21 @@ class MavenCoord:
     string
     """
     return '%s:%s:%s' % (self.group, self.artifact, self.version)
+  
+  @property
+  def full (self):
+    """ Returns the full maven coordinate
+    """
+    return '%s:%s:%s:%s:%s' % (
+      self.group,
+      self.artifact,
+      self.type,
+      self.version,
+      self.scope
+    )
 
   def resolve (self):
-    if self.scope == MavenCoord.SCOPE_DEFAULT:
-      self.scope = MavenCoord.SCOPE_COMPILE
+    self.scope = MavenCoord.resolveScope (self.scope)
     return
 
   def empty(self):
@@ -158,3 +171,96 @@ class MavenCoord:
 
   def __str__ (self):
     return self.id
+
+  def __repr__ (self):
+    return self.full
+
+
+  @staticmethod
+  def resolveScope (scope):
+    """ Resolves the scope to a canonical value (default is converted to compile)
+    """
+    if scope == MavenCoord.SCOPE_DEFAULT:
+      return MavenCoord.SCOPE_COMPILE
+    return scope
+
+  @staticmethod
+  def resolveConflict (coord1, coord2):
+    """ Resolve given coordinate conflict by sticking with the highest
+    version that resolves the conflict.
+
+    Returns the coordinate object with the highest version that resolves
+    the conflict.
+
+    It raises an exception if it cannot resolve the conflict
+    """
+    cmpValue = vercmp.compare (coord1.id, coord2.id)
+    newScope = MavenCoord.resolveScopeConflict (coord1.scope, coord2.scope)
+
+    # same value? any of both will do
+    if cmpValue == 0:
+      c1scope = MavenCoord.resolveScope (coord1.scope)
+      c2scope = MavenCoord.resolveScope (coord2.scope)
+      if c1scope != c2scope:
+        if c1scope == newScope:
+          return coord1
+        else:
+          return coord2
+
+      return coord1
+
+    # coord1 > coord2
+    if cmpValue > 0:
+      if vercmp.satisfies (coord1, coord2):
+        return coord1
+
+    # coord2 > coord1 or coord1 is higher and does not satisfies coord2
+    if vercmp.satisfies (coord2, coord1):
+      return coord2
+
+    raise Exception (
+      "Could not resolve conflict! '%s' vs '%s'" % (coord1.id, coord2.id)
+    )
+
+  @staticmethod
+  def resolveScopeConflict (scope1, scope2):
+    scope1 = MavenCoord.resolveScope (scope1)
+    scope2 = MavenCoord.resolveScope (scope2)
+
+    return {
+      'compile' : {
+        'compile' : 'compile',
+        'provided' : 'compile',
+        'runtime' : 'compile',
+        'system' : 'compile',
+        'test' : 'compile',
+      },
+      'provided' : {
+        'compile' : 'compile',
+        'provided' : 'provided',
+        'runtime' : 'runtime',
+        'system' : 'provided',
+        'test' : 'provided',
+      },
+      'runtime' : {
+        'compile' : 'compile',
+        'provided' : 'runtime',
+        'runtime' : 'runtime',
+        'system' : 'runtime',
+        'test' : 'runtime',
+      },
+      'system' : {
+        'compile' : 'compile',
+        'provided' : 'system',
+        'runtime' : 'system',
+        'system' : 'system',
+        'test' : 'system',
+      },
+      'test' : {
+        'compile' : 'compile',
+        'provided' : 'test',
+        'runtime' : 'runtime',
+        'system' : 'test',
+        'test' : 'test'
+      },
+    }[scope1][scope2]

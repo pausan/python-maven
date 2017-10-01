@@ -9,7 +9,15 @@ from mavencoord import MavenCoord
 from mavenrepo import MavenRepo
 
 class MavenRepoTest (unittest.TestCase):
+  """ Test fetching dependencies on any maven repository
 
+  If you want to add more tests feel free to prepare a pom.xml with
+  ceritain dependencies and resolve them with any of these commands:
+
+    $ mvn dependency:tree -DoutputType=text 
+    $ mvn dependency:tree -DoutputType=text -Doutput=deps.txt
+
+  """
   def testFetchNonExisting (self):
     repo = MavenRepo (MavenRepo.OFFICIAL_REPO_URL)
     maven = repo.fetchOne ('commons-io:commons-io:1.4.4.2')
@@ -79,54 +87,119 @@ class MavenRepoTest (unittest.TestCase):
     )
     return
 
-  def testFetchTree (self):
-    # TODO: work in progress... not perfect yet, but closer
-    return
+  def testFetchTreeForJUnit (self):
     repo = MavenRepo (MavenRepo.OFFICIAL_REPO_URL)
+    maven = repo.fetchResolvedTree ('junit:junit:4.11', 'compile')
+    maven.resolve(scope = 'compile')
+    self.assertEquals (
+      maven.deps.getFlattenCoordFullIds (),
+      [
+        u'org.hamcrest:hamcrest-core:jar:1.3:compile'
+      ]
+    )
+    return
 
-    #maven = repo.fetchResolvedTree ('org.codehaus.woodstox:woodstox-core-asl:4.4.1', 'compile')
-    #maven = repo.fetchResolvedTree ('junit:junit:4.11', 'compile')
-    #maven.resolve()
+  def testFetchTreeForCxfCore (self):
+    repo = MavenRepo (MavenRepo.OFFICIAL_REPO_URL)
+    maven = repo.fetchResolvedTree ('org.apache.cxf:cxf-core:3.0.2', 'compile')
+    maven.resolve(scope = 'compile')
+    self.assertEquals (
+      maven.deps.getFlattenCoordFullIds (),
+      [
+        'org.codehaus.woodstox:woodstox-core-asl:jar:4.4.1:compile',
+        'org.codehaus.woodstox:stax2-api:jar:3.1.4:compile',
+        'org.apache.ws.xmlschema:xmlschema-core:jar:2.1.0:compile',
+      ]
+    )
+    return
 
+  def testFetchTreeForCxfDatabinding (self):
+    repo = MavenRepo (MavenRepo.OFFICIAL_REPO_URL)
+    repo.setJdkVersion ('1.8') # different versions will change the result
 
-    maven = repo.fetchResolvedTree ('org.apache.cxf:cxf-rt-frontend-jaxws:3.0.2', 'compile')
-    # maven = repo.fetchResolvedTree ('org.apache.cxf:cxf-rt-ws-policy:3.0.2', 'compile')
-    #maven = repo.fetchResolvedTree ('org.apache.cxf:cxf-core:3.0.2', 'compile')
-    # self.assertEquals (maven.coord.id, 'org.apache.cxf:cxf-rt-frontend-jaxws:3.0.2')
+    maven = repo.fetchResolvedTree ('org.apache.cxf:cxf-rt-databinding-jaxb:3.0.2', 'compile')
+    maven.resolve(scope = 'compile')
+    self.assertEquals (
+      maven.deps.getFlattenCoordFullIds (),
+      [
+        'org.apache.cxf:cxf-core:jar:3.0.2:compile',
+        'org.codehaus.woodstox:woodstox-core-asl:jar:4.4.1:compile',
+        'org.codehaus.woodstox:stax2-api:jar:3.1.4:compile',
+        'org.apache.ws.xmlschema:xmlschema-core:jar:2.1.0:compile',
+        'org.apache.cxf:cxf-rt-wsdl:jar:3.0.2:compile',
+        'wsdl4j:wsdl4j:jar:1.6.3:compile',
+        'asm:asm:jar:3.3.1:compile',
+        'com.sun.xml.bind:jaxb-impl:jar:2.2.10-b140310.1920:compile',
+        'com.sun.xml.bind:jaxb-core:jar:2.2.10-b140310.1920:compile',
+      ]
+    )
+    return
 
+  def testFetchTreeForCxfRtWsPolicy (self):
+    return # FIXME! not working yet
+    repo = MavenRepo (MavenRepo.OFFICIAL_REPO_URL)
+    repo.setJdkVersion ('1.8') # different versions will change the result
+
+    maven = repo.fetchResolvedTree ('org.apache.cxf:cxf-rt-ws-policy:3.0.2', 'compile')
     maven.resolve(scope = 'compile')
 
-    # maven = repo.fetchWithAncestors ('org.apache.cxf:cxf-rt-databinding-jaxb:jar:3.0.2:compile')
-    # maven.resolve()
-    print "aaaaaaaaaaaa--------------------"
-    print maven.deps
-    # for x in maven.deps.getFlattenCoords():
-    #   print ' -- ', x.scope + ':' + x.id
-    print "/aaaaaaaaaaaa--------------------"
+    self.assertEquals (
+      maven.deps.getFlattenCoordFullIds (),
+      [
+        'wsdl4j:wsdl4j:jar:1.6.3:compile',
+        'org.apache.cxf:cxf-core:jar:3.0.2:compile',
+        'org.codehaus.woodstox:woodstox-core-asl:jar:4.4.1:compile',
+        'org.codehaus.woodstox:stax2-api:jar:3.1.4:compile',
+        'org.apache.ws.xmlschema:xmlschema-core:jar:2.1.0:compile',
+        'org.apache.neethi:neethi:jar:3.0.3:compile',
+      ]
+    )
+    return
 
-  # fetch maven file with ancestors, and then recursively start resolving dependencies
-  # and fetching them as well, along with the JAR files, making sure that whatever
-  # is provided is not downloaded and whatever is excluded neither
-  # 
-  # +- org.apache.cxf:cxf-rt-frontend-jaxws:jar:3.0.2:compile
-  # |  +- xml-resolver:xml-resolver:jar:1.2:compile
-  # |  +- asm:asm:jar:3.3.1:compile
-  # |  +- org.apache.cxf:cxf-core:jar:3.0.2:compile
-  # |  |  +- org.codehaus.woodstox:woodstox-core-asl:jar:4.4.1:compile
-  # |  |  |  \- org.codehaus.woodstox:stax2-api:jar:3.1.4:compile
-  # |  |  \- org.apache.ws.xmlschema:xmlschema-core:jar:2.1.0:compile
-  # |  +- org.apache.cxf:cxf-rt-bindings-soap:jar:3.0.2:compile
-  # |  |  +- org.apache.cxf:cxf-rt-wsdl:jar:3.0.2:compile
-  # |  |  |  \- wsdl4j:wsdl4j:jar:1.6.3:compile
-  # |  |  \- org.apache.cxf:cxf-rt-databinding-jaxb:jar:3.0.2:compile
-  # |  |     +- com.sun.xml.bind:jaxb-impl:jar:2.2.10-b140310.1920:compile
-  # |  |     \- com.sun.xml.bind:jaxb-core:jar:2.2.10-b140310.1920:compile
-  # |  +- org.apache.cxf:cxf-rt-bindings-xml:jar:3.0.2:compile
-  # |  +- org.apache.cxf:cxf-rt-frontend-simple:jar:3.0.2:compile
-  # |  \- org.apache.cxf:cxf-rt-ws-addr:jar:3.0.2:compile
-  # |     \- org.apache.cxf:cxf-rt-ws-policy:jar:3.0.2:compile
-  # |        \- org.apache.neethi:neethi:jar:3.0.3:compile
 
+  def testFetchTreeForCxfRtFrontendJaxws (self):
+    repo = MavenRepo (MavenRepo.OFFICIAL_REPO_URL)
+    repo.setJdkVersion ('1.8') # different versions will change the result
+
+    maven = repo.fetchResolvedTree ('org.apache.cxf:cxf-rt-frontend-jaxws:3.0.2', 'compile')
+    maven.resolve(scope = 'compile')
+
+    self.assertEquals (
+      maven.deps.getFlattenCoordFullIds (),
+      [x.strip() for x in [
+        'xml-resolver:xml-resolver:jar:1.2:compile',
+        'asm:asm:jar:3.3.1:compile',
+        'org.apache.cxf:cxf-core:jar:3.0.2:compile',
+        '  org.codehaus.woodstox:woodstox-core-asl:jar:4.4.1:compile',
+        '    org.codehaus.woodstox:stax2-api:jar:3.1.4:compile',
+        '  org.apache.ws.xmlschema:xmlschema-core:jar:2.1.0:compile',
+        'org.apache.cxf:cxf-rt-bindings-soap:jar:3.0.2:compile',
+        '  org.apache.cxf:cxf-rt-wsdl:jar:3.0.2:compile',
+        '    wsdl4j:wsdl4j:jar:1.6.3:compile',
+        '  org.apache.cxf:cxf-rt-databinding-jaxb:jar:3.0.2:compile',
+        '    com.sun.xml.bind:jaxb-impl:jar:2.2.10-b140310.1920:compile',
+        '    com.sun.xml.bind:jaxb-core:jar:2.2.10-b140310.1920:compile',
+        'org.apache.cxf:cxf-rt-bindings-xml:jar:3.0.2:compile',
+        'org.apache.cxf:cxf-rt-frontend-simple:jar:3.0.2:compile',
+        'org.apache.cxf:cxf-rt-ws-addr:jar:3.0.2:compile',
+        'org.apache.cxf:cxf-rt-ws-policy:jar:3.0.2:compile',
+        '  org.apache.neethi:neethi:jar:3.0.3:compile',
+        '    org.apache.cxf:cxf-rt-transports-http:jar:3.0.2:compile',
+      ]]
+    )
+    
 if __name__ == '__main__':
-  unittest.main()
-  
+  # repo = MavenRepo (MavenRepo.OFFICIAL_REPO_URL)
+  # repo.setJdkVersion ('1.8')
+  # maven = repo.fetchResolvedTree ('org.apache.cxf:cxf-rt-frontend-jaxws:3.0.2', 'compile')
+  # #maven = repo.fetchResolvedTree ('org.apache.cxf:cxf-rt-frontend-simple:3.0.2', 'compile')
+  # #maven = repo.fetchResolvedTree ('org.apache.cxf:cxf-rt-ws-addr:3.0.2', 'compile')
+  # print maven.deps
+  # print "---------"
+  # maven.resolve(scope = 'compile')
+  # print maven.deps
+  # print ''
+  # for x in maven.deps.getFlattenCoordFullIds():
+  #   print x
+  unittest.main() 
+

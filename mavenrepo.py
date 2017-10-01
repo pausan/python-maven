@@ -9,6 +9,7 @@ import xmltodict
 from maven import Maven
 from mavencoord import MavenCoord
 from mavenversiondb import MavenVersionDb
+import mavenversioncmp as mavenvercmp
 import mavenparser
 
 class MavenRepo:
@@ -155,7 +156,12 @@ class MavenRepo:
     if not coord:
       return None
 
-    return self._fetchTreeDeps (coord, scope, {}, {})
+    return self._fetchTreeDeps (
+      coord,
+      scope,
+      downloadedItems = {},
+      exclusions = {}
+    )
 
   def _fetchTreeDeps (self, coord, scope, downloadedItems, exclusions):
     """ Downloads given coordinate and its dependencies recursively for given
@@ -168,7 +174,12 @@ class MavenRepo:
     # is maven object in cache downloadedItems ['<group:artifact>']
     if coord.name in downloadedItems:
       if (downloadedItems [coord.name].coord.id != coord.id):
-        print "WARNING: expecting same coord id for package '%s'" % coord.id
+        if mavenvercmp.compare (
+          downloadedItems [coord.name].coord.id,
+          coord.id
+        ) < 0:
+          # TODO: adjust versions versions
+          print "WARNING: expecting same coord id for package '%s' vs '%s'" % (coord.id, downloadedItems [coord.name].coord.id)
       return downloadedItems [coord.name]
 
     maven = self.fetchWithAncestors (coord)
@@ -181,14 +192,12 @@ class MavenRepo:
 
     children = {}
     for dep in maven.deps.getFlattenDeps(skipOptional = True):
-      print "DEP: ", dep.coord.scope, dep.coord.id, dep.optional
       if (dep.coord.scope != scope):
-        print "Skipping:", dep.coord.scope, dep.coord.name
         continue
 
       if dep.coord.name in exclusions:
         if dep.coord.isContained (exclusions [dep.coord.name]):
-          print "Excluding:", dep.coord.scope, dep.coord.id
+          # exclude dep
           continue
 
       # build the new exclusion list based on current dep
@@ -207,7 +216,7 @@ class MavenRepo:
 
       children [dep.coord.id] = mavenChild
 
-    # update dependencies
+    # update dependencies of this element
     for dep in maven.deps.root.deps:
       if dep.coord.id not in children:
         continue
@@ -217,10 +226,9 @@ class MavenRepo:
       dep.deps += childDepsClone.root.deps
       dep.exclusions += childDepsClone.root.exclusions
 
-    maven.resolve (jdkVersion = self._jdkVersion)
-
     downloadedItems [coord.name] = maven
 
+    maven.resolve (jdkVersion = self._jdkVersion)
     return maven
 
   def _cacheFile (self, cacheName):

@@ -3,7 +3,6 @@
 
 from mavencoord import MavenCoord
 from mavendeps import MavenDeps
-import mavenparser
 import copy
 
 class Maven:
@@ -59,7 +58,6 @@ class Maven:
 
     self.deps.updateVersionsAndScope (self.depsManagement.root)
     self.deps.resolve (scope, skipOptional)
-
     return
 
   def _resolveProfiles (self):
@@ -77,8 +75,6 @@ class Maven:
 
     self.profiles = []
     return
-
-
 
   def expand (self):
     """ Expands all property variables and gets the effective dependencies

@@ -1,7 +1,9 @@
 #/usr/bin/env python
 # -*- coding: utf-8 -*- 
 import copy
+from collections import OrderedDict
 from mavencoord import MavenCoord
+import mavenversioncmp as vercmp
 
 class MavenDep:
   """ Class to model a single dependency along its internal dependencies
@@ -13,17 +15,14 @@ class MavenDep:
     self.exclusions = []
     return
 
-  def add (self, dep, override = False):
-    """ Add dependency
+  def add (self, dep):
+    """ Add a new dependency
+
+    NOTE: multiple dependencies to the same coord can be added, if that happens
+    they will be resolved at the end by following some prioritization rules.
     """
     if not isinstance (dep, MavenDep):
       raise Exception ("Expecting a MavenDep when adding dependency: %s" % str(dep))
-
-    if override:
-      self.deps = [d for d in self.deps if d.coord.name != dep.coord.name]
-
-    elif ([d for d in self.deps if d.coord.name == dep.coord.name]):
-      raise Exception ("Conflicting versions while adding dependencies: %s" % str(dep.coord))
 
     self.deps.append (dep)
     return
@@ -92,22 +91,56 @@ class MavenDep:
     else:
       scope = set (scope)
 
-    self._resolve ({}, scope, skipOptional)
+    # let's first resolve conflicting dependencies
+    winnerCoordFullIds = self._findWinnerCoordsInTree ()
+    self._removeNonWinnerDeps (winnerCoordFullIds)
+
+    # let's now 
+    self._resolve ({}, set(), scope, skipOptional)
     return self
 
-  def _resolve (self, itemsToExclude, scopeSet, skipOptional):
-    """ Resolve dependencies by excluding items
+  def _removeNonWinnerDeps (self, winnerCoordFullIds):
+    """ Remove all duplicates which have not
+    """
+    newDeps = []
+    for dep in self.deps:
+      if dep.coord.full in winnerCoordFullIds:
+        dep._removeNonWinnerDeps (winnerCoordFullIds)
+        newDeps.append (dep)
+
+    self.deps = newDeps
+    return
+
+  def _findWinnerCoordsInTree (self):
+    """ Finds which coordinates with duplicates are the ones that should
+    stay in the tree.
+
+    Returns a set of strings with the full coordinates of the 
+    """
+    allCoords = [x.coord for x in self.flatten (skipOptional = False)]
+
+    winnerCoords = {}
+    for coord in allCoords:
+      if coord.name in winnerCoords:
+        winnerCoord = MavenCoord.resolveConflict (coord, winnerCoords[coord.name])
+        if winnerCoord.full != coord.full:
+          continue
+
+      winnerCoords[coord.name] = coord
+
+    return set([c.full for c in winnerCoords.values()])
+
+
+  def _resolve (self, itemsToExclude, itemsAdded, scopeSet, skipOptional):
+    """ Resolve dependencies by excluding items and selecting the proper
+    version in case there are "duplicates" for the same coord.name
     """
     self.coord.resolve()
 
     for exclusion in self.exclusions:
       itemsToExclude[exclusion.name] = exclusion
 
-    itemsToExcludeNext = itemsToExclude.copy()
-    for dep in self.deps:
-      itemsToExcludeNext[dep.coord.name] = dep.coord
-
-    newDeps = []
+    newDeps = OrderedDict()
     for dep in self.deps:
       if scopeSet and (dep.coord.scope not in scopeSet):
         continue
@@ -123,17 +156,63 @@ class MavenDep:
         # print dep.coord.id, "vs", itemsToExclude[dep.coord.name].id
         continue
 
-      # need to copy to don't infect siblings with exclusions from sons
-      # of this dependency      
-      dep._resolve (itemsToExcludeNext.copy(), scopeSet, skipOptional)
-      
-      newDeps.append (dep)
+      if dep.coord.name in newDeps:
+        dep = MavenDep.resolveDependencyConflict (dep, newDeps[dep.coord.name])
 
-    self.deps = newDeps
+      # don't add same item twice when resolving a tree
+      if dep.coord.full in itemsAdded:
+        continue
+
+      newDeps[dep.coord.name] = dep
+      itemsAdded.add (dep.coord.full)
+
+    # resolve children
+    for dep in newDeps.values():
+      # need to copy to not modify siblings with exclusions from sons
+      # of this dependency      
+      dep._resolve (itemsToExclude.copy(), itemsAdded, scopeSet, skipOptional)
+      
+    self.deps = newDeps.values()
     self.exclusions = []
     return 
 
+  @staticmethod
+  def resolveDependencyConflict (dep1, dep2):
+    """ Resolve given dependency conflict by sticking with the highest
+    version that resolves the conflict.
+
+    Returns the dependency object with the highest version that resolves
+    the conflict.
+
+    It raises an exception if it cannot resolve the conflict
+    """
+    cmpValue = vercmp.compare (dep1.coord.id, dep2.coord.id)
+    newScope = MavenDep.resolveScopeConflict (dep1.coord.scope, dep2.coord.scope)
+
+    # same value? any of both will do
+    if cmpValue == 0:
+      dep1.coord.scope = newScope
+      return dep1
+
+    # dep1 > dep2
+    if cmpValue > 0:
+      if vercmp.satisfies (dep1.coord, dep2.coord):
+        dep1.coord.scope = newScope
+        return dep1
+
+    # dep2 > dep1 or dep1 is higher and does not satisfies dep2
+    if vercmp.satisfies (dep2.coord, dep1.coord):
+      dep2.coord.scope = newScope
+      return dep2
+
+    raise Exception (
+      "Could not resolve conflict! '%s' vs '%s'" % (dep1.coord.id, dep2.coord.id)
+    )
+  
   def updateVersionsAndScope (self, depManagement):
+    """ Update default or missing version numbers and default or missing
+    scopes with the right values inherited from given depManagement
+    """
     assert isinstance (depManagement, MavenDep)
 
     for dep in depManagement.deps:
@@ -152,13 +231,13 @@ class MavenDep:
 
 
   def __repr__ (self):
-    s = [self.coord.id]
+    s = [self.coord.full]
 
     for dep in self.deps:
       s.append ('  ' + repr(dep).replace ('\n', '\n  '))
 
     for dep in self.exclusions:
-      s.append ('  <<< ' + dep.id)
+      s.append ('  <<< ' + dep.full)
 
     return '\n'.join (s)
 
@@ -186,11 +265,11 @@ class MavenDeps:
     # remove 1 to account for the root element
     return self.root.count() - 1
 
-  def add (self, dep, override = False):
+  def add (self, dep):
     """ Adds a maven dependency by either specifying a coordinate string, a 
     MavenCoord or a MavenDep.
     """
-    self.root.add (dep, override)
+    self.root.add (dep)
     return
 
   def find (self, coord):
@@ -210,7 +289,7 @@ class MavenDeps:
       raise Exception ("Expecting MavenDeps object")
 
     for obj in mavenDepsObj.root.deps:
-      self.add (copy.deepcopy (obj), override = True)
+      self.add (copy.deepcopy (obj))
     return
 
   def expand (self, properties):
@@ -249,6 +328,11 @@ class MavenDeps:
     """ Returns a flatten list of all dependencies as coordinates
     """
     return [d.coord.id for d in self.root.flatten (skipOptional)]
+  
+  def getFlattenCoordFullIds (self, skipOptional = True):
+    """ Returns a flatten list of all dependencies as coordinates
+    """
+    return [d.coord.full for d in self.root.flatten (skipOptional)]
 
   def __repr__ (self):
     return repr(self.root)

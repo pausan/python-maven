@@ -22,17 +22,27 @@ class MavenProfile:
       return True
     
     if ('jdk' in self.activation) and ('jdk' in properties):
-      return vercmp.satisfies (properties['jdk'], self.activation['jdk'])
+      jdkActivation = self.activation['jdk']
+
+      # if a specific version is specified, it should match exactly (e.g: 1.8)
+      if len(jdkActivation) == len(jdkActivation.strip('[](),')):
+        return (properties['jdk'].lower().strip() == jdkActivation.lower().strip())
+
+      # if a range is specified, then compare accordingly (e.g: [1.8,1.9] )
+      return vercmp.satisfies (properties['jdk'], jdkActivation)
 
     # is it avaliable as a property?
     if ('property' in self.activation):
       name = self.activation.get('property', {}).get ('name', '')
-      value = self.activation.get('property', {}).get ('value', '')
-      
-      # NOTE: there are several scenarios in order to expand properties for
-      #       comparison, the simplest is the one implemented
-      if properties.get(name, '').strip() == value.strip():
-        return True
+      if name in properties:
+        value = self.activation.get('property', {}).get ('value', '')
+        if value is None:
+          value = ''
+        
+        # NOTE: there are several scenarios in order to expand properties for
+        #       comparison, the simplest is the one implemented
+        if properties.get(name, '').strip() == value.strip():
+          return True
 
     return False
 

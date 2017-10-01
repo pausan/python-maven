@@ -113,3 +113,14 @@ class MavenCoordTest (unittest.TestCase):
     self.assertTrue (MavenCoord('A:B:1.0').isContained ('A:B'))
     self.assertFalse (MavenCoord('A:B:1.2').isContained ('A:B:1.0'))
     return
+
+  def testResolveCoordConflict (self):
+    winner = MavenCoord.resolveConflict (MavenCoord('a:a:jar:1:compile'), MavenCoord('a:a:jar:1:test'))
+    self.assertTrue (winner.full == 'a:a:jar:1:compile')
+
+    winner = MavenCoord.resolveConflict (MavenCoord('a:a:jar:1:test'), MavenCoord('a:a:jar:1:compile'))
+    self.assertTrue (winner.full == 'a:a:jar:1:compile')
+
+
+if __name__ == '__main__':
+  unittest.main()
