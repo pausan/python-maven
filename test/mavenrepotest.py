@@ -136,7 +136,6 @@ class MavenRepoTest (unittest.TestCase):
     return
 
   def testFetchTreeForCxfRtWsPolicy (self):
-    return # FIXME! not working yet
     repo = MavenRepo (MavenRepo.OFFICIAL_REPO_URL)
     repo.setJdkVersion ('1.8') # different versions will change the result
 
@@ -145,17 +144,16 @@ class MavenRepoTest (unittest.TestCase):
 
     self.assertEquals (
       maven.deps.getFlattenCoordFullIds (),
-      [
+      [x.strip() for x in [
         'wsdl4j:wsdl4j:jar:1.6.3:compile',
         'org.apache.cxf:cxf-core:jar:3.0.2:compile',
-        'org.codehaus.woodstox:woodstox-core-asl:jar:4.4.1:compile',
-        'org.codehaus.woodstox:stax2-api:jar:3.1.4:compile',
-        'org.apache.ws.xmlschema:xmlschema-core:jar:2.1.0:compile',
+        '  org.codehaus.woodstox:woodstox-core-asl:jar:4.4.1:compile',
+        '    org.codehaus.woodstox:stax2-api:jar:3.1.4:compile',
+        '  org.apache.ws.xmlschema:xmlschema-core:jar:2.1.0:compile',
         'org.apache.neethi:neethi:jar:3.0.3:compile',
-      ]
+      ]]
     )
     return
-
 
   def testFetchTreeForCxfRtFrontendJaxws (self):
     repo = MavenRepo (MavenRepo.OFFICIAL_REPO_URL)
@@ -181,25 +179,13 @@ class MavenRepoTest (unittest.TestCase):
         '    com.sun.xml.bind:jaxb-core:jar:2.2.10-b140310.1920:compile',
         'org.apache.cxf:cxf-rt-bindings-xml:jar:3.0.2:compile',
         'org.apache.cxf:cxf-rt-frontend-simple:jar:3.0.2:compile',
+        'org.apache.cxf:cxf-rt-transports-http:jar:3.0.2:compile',
         'org.apache.cxf:cxf-rt-ws-addr:jar:3.0.2:compile',
         'org.apache.cxf:cxf-rt-ws-policy:jar:3.0.2:compile',
         '  org.apache.neethi:neethi:jar:3.0.3:compile',
-        '    org.apache.cxf:cxf-rt-transports-http:jar:3.0.2:compile',
       ]]
     )
     
 if __name__ == '__main__':
-  # repo = MavenRepo (MavenRepo.OFFICIAL_REPO_URL)
-  # repo.setJdkVersion ('1.8')
-  # maven = repo.fetchResolvedTree ('org.apache.cxf:cxf-rt-frontend-jaxws:3.0.2', 'compile')
-  # #maven = repo.fetchResolvedTree ('org.apache.cxf:cxf-rt-frontend-simple:3.0.2', 'compile')
-  # #maven = repo.fetchResolvedTree ('org.apache.cxf:cxf-rt-ws-addr:3.0.2', 'compile')
-  # print maven.deps
-  # print "---------"
-  # maven.resolve(scope = 'compile')
-  # print maven.deps
-  # print ''
-  # for x in maven.deps.getFlattenCoordFullIds():
-  #   print x
   unittest.main() 
 

@@ -91,21 +91,75 @@ class MavenDep:
     else:
       scope = set (scope)
 
-    # let's first resolve conflicting dependencies
-    winnerCoordFullIds = self._findWinnerCoordsInTree ()
-    self._removeNonWinnerDeps (winnerCoordFullIds)
+    self._removeOptionalAndExclusionsInTree ({}, scope, skipOptional)
 
-    # let's now 
-    self._resolve ({}, set(), scope, skipOptional)
+    # resolve modules included more than once with different versions
+    winnerCoordFullIds = self._findWinnerCoordsInTree ()
+    self._removeNonWinnerDepsInTree (winnerCoordFullIds)
+
+    self._removeDuplicatesInTree ( set() )
     return self
 
-  def _removeNonWinnerDeps (self, winnerCoordFullIds):
+  def _removeDuplicatesInTree (self, itemsAdded):
+    newDeps = OrderedDict()
+    for dep in self.deps:
+      # don't add same item twice when resolving a tree
+      if dep.coord.full in itemsAdded:
+        continue
+
+      newDeps[dep.coord.name] = dep
+      itemsAdded.add (dep.coord.full)
+
+    for dep in newDeps.values():
+      dep._removeDuplicatesInTree (itemsAdded)
+
+    self.deps = newDeps.values()
+    return
+
+  def _removeOptionalAndExclusionsInTree (self, itemsToExclude, scopeSet, skipOptional):
+    self.coord.resolve()
+
+    for exclusion in self.exclusions:
+      itemsToExclude[exclusion.name] = exclusion
+
+    newDeps = OrderedDict()
+    for dep in self.deps:
+      if scopeSet and (dep.coord.scope not in scopeSet):
+        continue
+
+      if skipOptional and dep.optional:
+        continue
+
+      if dep.coord.name in itemsToExclude:
+        if dep.coord.isContained (itemsToExclude[dep.coord.name]):        
+          continue
+
+        # excusion pseudo-match?
+        # print dep.coord.id, "vs", itemsToExclude[dep.coord.name].id
+        continue
+
+      if dep.coord.name in newDeps:
+        dep = MavenDep.resolveDependencyConflict (dep, newDeps[dep.coord.name])
+
+      newDeps[dep.coord.name] = dep
+
+    # resolve children
+    for dep in newDeps.values():
+      # need to copy to not modify siblings with exclusions from sons
+      # of this dependency      
+      dep._removeOptionalAndExclusionsInTree (itemsToExclude.copy(), scopeSet, skipOptional)
+      
+    self.deps = newDeps.values()
+    self.exclusions = []
+    return 
+
+  def _removeNonWinnerDepsInTree (self, winnerCoordFullIds):
     """ Remove all duplicates which have not
     """
     newDeps = []
     for dep in self.deps:
       if dep.coord.full in winnerCoordFullIds:
-        dep._removeNonWinnerDeps (winnerCoordFullIds)
+        dep._removeNonWinnerDepsInTree (winnerCoordFullIds)
         newDeps.append (dep)
 
     self.deps = newDeps
@@ -187,7 +241,7 @@ class MavenDep:
     It raises an exception if it cannot resolve the conflict
     """
     cmpValue = vercmp.compare (dep1.coord.id, dep2.coord.id)
-    newScope = MavenDep.resolveScopeConflict (dep1.coord.scope, dep2.coord.scope)
+    newScope = MavenCoord.resolveScopeConflict (dep1.coord.scope, dep2.coord.scope)
 
     # same value? any of both will do
     if cmpValue == 0:
