@@ -15,7 +15,6 @@ import mavenparser
 class MavenRepo:
   """ Manages the dependencies and downloads of a maven repository
   """
-
   OFFICIAL_REPO_URL = 'https://repo.maven.apache.org/maven2/'
 
   def __init__ (
@@ -72,16 +71,24 @@ class MavenRepo:
     }      
     return self._repoUrl.rstrip('/') + '/' + baseurl.lstrip('/')
 
-  def getPomUrlFor (self, coord):
-    """ Returns the URL for downloading given coordinate
-    """
+  def getBaseUrlFor (self, coord):
     coord = MavenCoord (coord)
     baseurl = "%(group)s/%(artifact)s/%(version)s/%(artifact)s-%(version)s" % {
       'group'    : '/'.join (coord.group.split('.')),
       'artifact' : coord.artifact,
       'version'  : coord.version
     }      
-    return self._repoUrl.rstrip('/') + '/' + baseurl.lstrip('/') + '.pom'
+    return self._repoUrl.rstrip('/') + '/' + baseurl.lstrip('/')
+
+  def getJarUrlFor (self, coord):
+    """ Returns the URL for downloading the artifact for given coordinate
+    """
+    return self.getBaseUrlFor (coord) + '.jar'
+
+  def getPomUrlFor (self, coord):
+    """ Returns the URL for downloading given coordinate
+    """
+    return self.getBaseUrlFor (coord) + '.pom'
 
   def resolveCoord (self, coord):
     """ Resolve coordinate so it has group, artifact and version numbers
@@ -163,6 +170,53 @@ class MavenRepo:
       exclusions = {}
     )
 
+  def downloadUrl (self, downloadUrl):
+    """ Downloads given URL and saves the file in the cache dir, in case
+    the file is already there, it won't download the file.
+
+    Returns the path where the file is stored.
+    """
+    jarFileName = downloadUrl.split('/')[-1]
+    destJarPath = os.path.join (self._cacheDir, jarFileName)
+
+    if os.path.exists (destJarPath):
+      return destJarPath
+
+    r = requests.get(downloadUrl, stream=True)
+    with open(destJarPath, 'wb') as f:
+        shutil.copyfileobj(r.raw, f)
+
+    return destJarPath    
+
+  def downloadArtifacts (self, coord, scope):
+    """ Resolves all dependencies for given coord and downloads all artifacts
+    """
+    if isinstance(coord, list):
+      result = []
+      for c in coord:
+        result.extend (self.downloadArtifacts (c, scope))
+      return result
+
+    mavenObj = self.fetchResolvedTree (coord, scope)
+    if not mavenObj:
+      return []
+
+    result = []
+    for coord in [MavenCoord(coord)] + mavenObj.deps.getFlattenCoords():
+      normCoord = self._versionDb.findOrRegister (coord)
+      if normCoord.version and coord.version:
+        if mavenvercmp.compare (coord.version, normCoord.version) > 0:
+          print (
+            "WARNING: it seems you are downloading an outdated version (update your version DB):\n"
+            "  - proposal: %s\n" 
+            "  -    using: %s" % (coord, normCoord)
+          )
+
+      downloadUrl = self.getJarUrlFor (normCoord)
+      destJarPath = self.downloadUrl (downloadUrl)
+      result.append (destJarPath)
+    return result
+
   def _fetchTreeDeps (self, coord, scope, downloadedItems, exclusions):
     """ Downloads given coordinate and its dependencies recursively for given
     scope. All downloaded dependencies will be added to downloadedItems to avoid
@@ -228,7 +282,7 @@ class MavenRepo:
 
     downloadedItems [coord.name] = maven
 
-    maven.resolve (jdkVersion = self._jdkVersion)
+    maven.resolve (scope = scope, jdkVersion = self._jdkVersion)
     return maven
 
   def _cacheFile (self, cacheName):
@@ -253,11 +307,11 @@ class MavenRepo:
     return default
 
   def _cacheSave (self, cacheName, data):
-    """ Returns data from the cache (if exists)
+    """ Saves data to cache
     """
     cacheFile = self._cacheFile (cacheName)
     with open (cacheFile, 'wb') as f:
-      f.write (data)
+      f.write (data.encode('utf-8'))
     return
 
   def _download2string (self, url):

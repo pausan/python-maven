@@ -32,6 +32,10 @@
     </parent>
     <properties>
         <cxf.spi-dir>spi-2.1</cxf.spi-dir>
+        
+        <!-- adding this duplicate on purpose to make sure we properly handle overrides -->
+        <cxf.spi-dir>spi-2.1</cxf.spi-dir>
+
         <cxf.osgi.import>
             javax.servlet*;version="${cxf.osgi.javax.servlet.version}",
             org.apache.aries*;version="${cxf.aries.version.range}";resolution:=optional,

@@ -53,6 +53,12 @@ class MavenVersionDb:
     self._db[myId] = m.version
     return m
 
+  def findOrRegister (self, coord):
+    normCoord = self.find (coord)
+    if normCoord is None:
+      return self.register (coord)
+    return normCoord
+
   def find (self, coord):
     """ Finds a coordinate that matches given group and artifact
     """
@@ -78,7 +84,7 @@ class MavenVersionDb:
     
     self._warnings.add (coord)
 
-    pyke.safeprint (
+    print (
       "WARNING: Unhandled dependency conflict for %s (expecting version '%s')" % (
         coord,
         existingVersion

@@ -117,6 +117,18 @@ def _parseProperties (projectObj):
   
   allProperties = projectObj.get ('properties', {})
   for k, v in allProperties.items():
+    # when v is a list means that the same property is specified more
+    # than once, on those scenarios just get the last one defined
+    #
+    # XML is like:
+    #   <prop>myvalue1</prop>
+    #   <prop>myvalue2</prop>
+    #   
+    # then v is like:
+    #   v = ['myvalue1', 'myvalue2']
+    if isinstance (v, list):
+      v = v[-1]
+    
     properties [k] = v if (v is not None) else ''
 
   return properties
