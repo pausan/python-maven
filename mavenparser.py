@@ -116,6 +116,9 @@ def _parseProperties (projectObj):
   properties = {}
   
   allProperties = projectObj.get ('properties', {})
+  if allProperties is None:
+    allProperties = {}
+
   for k, v in allProperties.items():
     # when v is a list means that the same property is specified more
     # than once, on those scenarios just get the last one defined

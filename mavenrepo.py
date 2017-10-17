@@ -159,6 +159,8 @@ class MavenRepo:
   def fetchResolvedTree (self, coord, scope):
     """ Recursively gets all the dependencies for given POM Coordinate
     """
+    assert isinstance (scope, basestring)
+
     coord = self.resolveCoord (coord)
     if not coord:
       return None
@@ -266,9 +268,9 @@ class MavenRepo:
         downloadedItems,
         newExclusions
       )
-      mavenChild.resolve (jdkVersion = self._jdkVersion)
-
-      children [dep.coord.id] = mavenChild
+      if mavenChild:
+        mavenChild.resolve (jdkVersion = self._jdkVersion)
+        children [dep.coord.id] = mavenChild
 
     # update dependencies of this element
     for dep in maven.deps.root.deps:
